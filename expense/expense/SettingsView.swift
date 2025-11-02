@@ -6,22 +6,66 @@
 //
 
 import SwiftUI
+import CoreData
 
 struct SettingsView: View {
     @ObservedObject var darkModeManager: DarkModeManager
     @AppStorage("currencySymbol") private var currencySymbol = "₹"
     @AppStorage("enableNotifications") private var enableNotifications = false
+    @StateObject private var securityManager = SecurityManager()
+    @StateObject private var dataExporter = DataExporter()
+    @State private var showingPINSetup = false
+    @State private var showingChangePIN = false
+    @State private var showingExportOptions = false
+    @State private var showingExportSheet = false
+    @State private var exportURL: URL?
+    @Environment(\.managedObjectContext) private var viewContext
+    
+    // Get expense and income data for export
+    private var expenses: [ExpenseItem] {
+        let request: NSFetchRequest<Expense> = Expense.fetchRequest()
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \Expense.date, ascending: false)]
+        
+        do {
+            let coreDataExpenses = try viewContext.fetch(request)
+            return coreDataExpenses.map { coreDataExpense in
+                let name = coreDataExpense.category ?? "Other"
+                let enumCat = ExpenseCategory(rawValue: name) ?? .other
+                return ExpenseItem(
+                    id: coreDataExpense.id ?? UUID(),
+                    amount: coreDataExpense.amount,
+                    category: enumCat,
+                    categoryName: name,
+                    date: coreDataExpense.date ?? Date(),
+                    notes: coreDataExpense.notes
+                )
+            }
+        } catch {
+            return []
+        }
+    }
+    
+    private var income: [IncomeItem] {
+        // Get income from the shared view model if available
+        // Otherwise create a temporary instance to get current data
+        let incomeVM = IncomeViewModel()
+        // Fetch fresh data
+        return incomeVM.incomes
+    }
     
     var body: some View {
         NavigationView {
             Form {
                 Section(header: Text("Preferences")) {
                     HStack {
-                        Text("Currency Symbol")
+                        Text("Currency")
                         Spacer()
-                        TextField("Currency", text: $currencySymbol)
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 60)
+                        Picker("Currency", selection: $currencySymbol) {
+                            Text("$ USD").tag("$")
+                            Text("€ EUR").tag("€")
+                            Text("₹ INR").tag("₹")
+                        }
+                        .pickerStyle(MenuPickerStyle())
                     }
                     
                     Toggle("Enable Notifications", isOn: $enableNotifications)
@@ -62,11 +106,61 @@ struct SettingsView: View {
                     }
                 }
                 
+                Section(header: Text("Security")) {
+                    Toggle("App Lock", isOn: $securityManager.enableAppLock)
+                        .onChange(of: securityManager.enableAppLock) { _, enabled in
+                            securityManager.saveSettings()
+                            if enabled && securityManager.passcode.isEmpty && !showingPINSetup {
+                                showingPINSetup = true
+                            }
+                        }
+                    
+                    if securityManager.enableAppLock {
+                        // Face ID option (always show, but disabled if not available)
+                        Toggle("Face ID", isOn: $securityManager.useFaceID)
+                            .disabled(!securityManager.isBiometricAvailable)
+                            .onChange(of: securityManager.useFaceID) { oldValue, newValue in
+                                securityManager.saveSettings()
+                                // If trying to disable Face ID but PIN is also disabled, enable PIN
+                                if !newValue && !securityManager.usePIN {
+                                    securityManager.usePIN = true
+                                    securityManager.saveSettings()
+                                }
+                            }
+                        
+                        // PIN option
+                        Toggle("PIN", isOn: $securityManager.usePIN)
+                            .onChange(of: securityManager.usePIN) { oldValue, newValue in
+                                if newValue && securityManager.passcode.isEmpty && !showingPINSetup {
+                                    showingPINSetup = true
+                                }
+                                // If trying to disable PIN but Face ID is also disabled, enable Face ID if available
+                                if !newValue && !securityManager.useFaceID && securityManager.isBiometricAvailable {
+                                    securityManager.useFaceID = true
+                                }
+                                securityManager.saveSettings()
+                            }
+                        
+                        if !securityManager.passcode.isEmpty {
+                            Button(action: { showingChangePIN = true }) {
+                                HStack {
+                                    Text("Change PIN")
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .foregroundColor(.primary)
+                        }
+                    }
+                }
+                
                 Section(header: Text("About")) {
                     HStack {
                         Text("Version")
                         Spacer()
-                        Text("1.0.0")
+                        Text("1.0.1")
                             .foregroundColor(.secondary)
                     }
                     
@@ -80,7 +174,7 @@ struct SettingsView: View {
                 
                 Section {
                     Button("Export Data") {
-                        // TODO: Implement data export
+                        showingExportOptions = true
                     }
                     .foregroundColor(.blue)
                     
@@ -91,7 +185,60 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
+            .sheet(isPresented: $showingPINSetup) {
+                PINSetupView(securityManager: securityManager)
+            }
+            .sheet(isPresented: $showingChangePIN) {
+                PINSetupView(securityManager: securityManager)
+            }
+            .confirmationDialog("Export Format", isPresented: $showingExportOptions, titleVisibility: .visible) {
+                Button("Export as PDF") {
+                    exportData(format: .pdf)
+                }
+                
+                Button("Export as Excel (CSV)") {
+                    exportData(format: .excel)
+                }
+                
+                Button("Cancel", role: .cancel) { }
+            }
+            .sheet(item: Binding<URL?>(get: { exportURL }, set: { exportURL = $0 })) { url in
+                ShareSheet(activityItems: [url])
+            }
         }
+    }
+    
+    private func exportData(format: DataExporter.ExportFormat) {
+        let url: URL?
+        
+        if format == .pdf {
+            url = dataExporter.exportToPDF(expenses: expenses, income: income, currencySymbol: currencySymbol)
+        } else {
+            url = dataExporter.exportToCSV(expenses: expenses, income: income, currencySymbol: currencySymbol)
+        }
+        
+        if let url = url {
+            exportURL = url
+        }
+    }
+}
+
+// MARK: - Share Sheet
+struct ShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+        return controller
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+// Extension to make URL Identifiable for sheet
+extension URL: Identifiable {
+    public var id: String {
+        self.absoluteString
     }
 }
 
@@ -213,7 +360,7 @@ private struct EditIncomeCategorySheet: View {
                         TextField("Emoji", text: $emoji)
                             .textInputAutocapitalization(.never)
                             .disableAutocorrection(true)
-                            .onChange(of: emoji) { newValue in
+                            .onChange(of: emoji) { oldValue, newValue in
                                 enforceSingleGrapheme()
                                 if colorHex.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                     colorHex = suggestedHex(from: emoji) ?? colorHex
@@ -229,7 +376,7 @@ private struct EditIncomeCategorySheet: View {
                             .multilineTextAlignment(.trailing)
                             .textInputAutocapitalization(.never)
                             .disableAutocorrection(true)
-                            .onChange(of: colorHex) { _ in
+                            .onChange(of: colorHex) { oldValue, newValue in
                                 colorHex = colorHex.trimmingCharacters(in: .whitespaces)
                             }
                     }

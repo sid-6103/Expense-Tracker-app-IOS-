@@ -19,6 +19,8 @@ A comprehensive personal finance management iOS application built with SwiftUI a
 - ✅ **Dark Mode Support**: Adapts to system appearance settings
 - ✅ **Settings Panel**: Customizable preferences and app information
 - ✅ **Modern UI/UX**: Beautiful, intuitive interface with smooth animations
+- ✅ **Data Export**: Export expenses + income as PDF or CSV (Excel)
+- ✅ **Currency Picker**: Choose $, €, or ₹ and the symbol updates app‑wide (lists, stats, and exports)
 
 ## 🏗 Architecture
 
@@ -37,8 +39,11 @@ expense/
 │   ├── HomeView.swift            # Main expenses list and summary
 │   ├── AddExpenseView.swift      # Add new expense form
 │   ├── ExpenseRowView.swift      # Individual expense display
+│   ├── IncomeRowView.swift       # Individual income display
 │   ├── StatisticsView.swift      # Charts and analytics
-│   ├── ExpenseViewModel.swift    # Business logic and data management
+│   ├── ExpenseViewModel.swift    # Business logic for expenses
+│   ├── IncomeViewModel.swift     # Business logic for income
+│   ├── DataExporter.swift        # PDF/CSV export implementation
 │   ├── ExpenseModel.swift        # Data models and enums
 │   ├── Persistence.swift         # Core Data setup
 │   └── expense.xcdatamodeld/     # Core Data model
@@ -46,28 +51,25 @@ expense/
 
 ## 🎯 Core Features
 
-### 1. Expense Management
-- **Add Expenses**: Simple form with amount, category picker, date picker, and notes
-- **Edit Expenses**: Tap any expense to modify details
-- **Delete Expenses**: Swipe to delete or use edit mode
-- **Categories**: Food, Travel, Shopping, Bills, Entertainment, Health, Other
+### 1. Expense & Income Management
+- **Add/Edit/Delete** expenses and incomes
+- **Categories**: Food, Travel, Shopping, Bills, Entertainment, Health, Other (plus income types)
 
 ### 2. Smart Filtering
 - **Time Filters**: All, Today, This Week, This Month
-- **Category Filters**: Filter by specific expense categories
-- **Search**: Find expenses by notes or category names
+- **Category Filters**: Filter by specific categories
+- **Search**: Find items by notes or category names
 
 ### 3. Visual Analytics
 - **Summary Cards**: Today's total, weekly total, monthly total
 - **Category Breakdown**: Visual representation of spending by category
 - **Spending Trends**: Bar chart showing daily spending patterns
-- **Percentage Calculations**: Category-wise spending percentages
 
 ### 4. User Experience
 - **Intuitive Navigation**: Tab-based interface with clear sections
 - **Responsive Design**: Adapts to different screen sizes
 - **Smooth Animations**: Fluid transitions and interactions
-- **Empty States**: Helpful guidance when no expenses exist
+- **Empty States**: Helpful guidance when no items exist
 
 ## 🚀 Getting Started
 
@@ -93,7 +95,7 @@ expense/
    - Press `Cmd + R` or click the Run button
 
 ### First Run
-- The app will start with sample data for demonstration
+- The app may include sample data for demonstration
 - Add your first expense using the "+" button
 - Explore different tabs and features
 - Customize settings in the Settings tab
@@ -111,66 +113,47 @@ struct ExpenseItem {
 }
 ```
 
-### Categories
-- **Food** 🍴 - Orange color
-- **Travel** 🚗 - Blue color
-- **Shopping** 🛍️ - Purple color
-- **Bills** 📄 - Red color
-- **Entertainment** 📺 - Green color
-- **Health** ❤️ - Pink color
-- **Other** ⚪ - Gray color
-
 ## 🔧 Customization
 
-### Currency Format
+### Currency
 - Default: Indian Rupees (₹)
-- Customizable in Settings tab
-- Automatically adapts to system locale
+- Change in Settings: Picker with `$` (USD), `€` (EUR), `₹` (INR)
+- Applies globally: lists, statistics, and PDF/CSV exports
+
+### Data Export
+- Open Settings → Export Data
+- Choose: "Export as PDF" or "Export as Excel (CSV)"
+- PDF includes: Title, date, summary (totals), Income section, then Expenses section
+- CSV is Excel‑compatible with properly escaped fields
 
 ### Appearance
 - Light/Dark mode support
-- Customizable accent colors
-- Responsive typography
-
-### Data Management
-- Export functionality (planned)
-- Data backup and restore
-- Clear all data option
+- Customizable accent tint based on theme
 
 ## 📱 Screenshots
-
-The app features three main tabs:
-
-1. **Home Tab**: Expense list, summary cards, search and filters
-2. **Statistics Tab**: Charts, category breakdown, spending trends
-3. **Settings Tab**: Preferences, app information, data management
+- Home, Statistics, and Settings tabs showcase lists, charts, and preferences
 
 ## 🛠 Technical Implementation
 
 ### Core Data Integration
 - Automatic data persistence
 - Efficient querying and filtering
-- Sample data for previews
 
 ### SwiftUI Best Practices
 - ObservableObject pattern for state management
 - Proper view separation and reusability
-- Accessibility support
 
 ### Performance Optimizations
 - Lazy loading for large lists
 - Efficient Core Data queries
-- Minimal memory footprint
 
 ## 🔮 Future Enhancements
 
-- [ ] **Data Export**: CSV/PDF export functionality
-- [ ] **Local Notifications**: Daily expense reminders
-- [ ] **Budget Tracking**: Set and monitor spending limits
+- [ ] **Budgets**: Monthly budget & alerts
+- [ ] **Local Notifications**: Daily reminders
 - [ ] **Receipt Photos**: Attach images to expenses
-- [ ] **Cloud Sync**: iCloud integration for data backup
-- [ ] **Widgets**: Home screen expense summaries
-- [ ] **Apple Watch**: Companion app for quick logging
+- [ ] **Cloud Sync**: iCloud backup/sync
+- [ ] **Widgets**: Home screen summaries
 
 ## 🤝 Contributing
 

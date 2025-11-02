@@ -177,10 +177,9 @@ class ExpenseViewModel: ObservableObject {
     
     // MARK: - Formatting
     func formatCurrency(_ amount: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.locale = Locale.current
-        return formatter.string(from: NSNumber(value: amount)) ?? "₹\(amount)"
+        let symbol = UserDefaults.standard.string(forKey: "currencySymbol") ?? "₹"
+        let formatted = String(format: "%.2f", amount)
+        return "\(symbol)\(formatted)"
     }
     
     func formatDate(_ date: Date) -> String {
